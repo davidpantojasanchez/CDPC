@@ -6,6 +6,7 @@ include "../Auxiliary/Map.dfy"
 
 
 method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, interview:Interview) returns (r:bool, ghost counter:nat)
+  requires forall c1, c2:Candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires f.Keys() == g.Keys()
   requires forall c:Candidate | c in f.Keys() :: (P.Model() <= c.Keys)
   requires 0.0 <= a <= b <= 1.0
