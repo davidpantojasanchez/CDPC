@@ -13,6 +13,7 @@ Parcial: No es necesario poder discernir con certeza absoluta la aptitud de la p
 Cambiado para que las respuestas sean booleanas (es suficiente para la reducción)
 */
 ghost predicate CDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P:set<int>, a:real, b:real, x:real, y:real)
+  requires forall c1, c2:Candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
   requires f.Keys == g.Keys
   requires forall c:Candidate | c in f.Keys :: (P <= c.Keys)
   requires 0.0 <= a <= b <= 1.0
@@ -22,7 +23,8 @@ ghost predicate CDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P:set<int>, 
 }
 
 ghost predicate certificateCDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P:set<int>, a:real, b:real, x:real, y:real, interview:Interview)
-  decreases f.Keys
+  //decreases f.Keys
+  requires forall c1, c2:Candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
   requires f.Keys == g.Keys
   requires forall c:Candidate | c in f.Keys :: (P <= c.Keys)
   requires 0.0 <= a <= b <= 1.0
@@ -50,8 +52,8 @@ ghost predicate certificateCDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P
   var question:int := interview.Key;
   // Pregunta válida y no trivial
   (forall candidate:Candidate | candidate in f.Keys :: question in candidate.Keys) &&
-  (exists candidate:Candidate | candidate in f.Keys :: candidate[question] == true) &&
-  (exists candidate:Candidate | candidate in f.Keys :: candidate[question] == false) &&
+  //(exists candidate:Candidate | candidate in f.Keys :: candidate[question] == true) &&
+  //(exists candidate:Candidate | candidate in f.Keys :: candidate[question] == false) &&
   // Casos recursivos (candidatos que responden que sí y que no)
   certificateCDPC(
     (map c:Candidate | c in f.Keys && c[question] == true :: f[c]),

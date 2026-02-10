@@ -35,18 +35,20 @@ type Map< T0(==), T1(==) > {
 
   method {:axiom} Get(key:T0, ghost counter_in:nat) returns (val:T1, ghost counter_out:nat)
     requires Valid()
-    ensures key in Model().Keys
+    requires key in Model().Keys
     ensures val == Model()[key]
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Insert(key:T0, val:T1, ghost counter_in:nat) returns (r:Map<T0,T1>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model()[key := val]
     ensures r.Universe() == Universe()[key := val]
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:T0, ghost counter_in:nat) returns (r:Map<T0,T1>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model() - {key}
     ensures counter_out == counter_in + UBSize()
 
@@ -62,11 +64,12 @@ type Map< T0(==), T1(==) > {
 
   method {:axiom} Empty(ghost counter_in:nat) returns (b:bool, ghost counter_out:nat)
     requires Valid()
-    ensures b == (|Model()| == 0)
+    ensures b == (Model() == map[])//(|Model()| == 0)
     ensures counter_out == counter_in + 1
 
   method {:axiom} Copy(ghost counter_in:nat) returns (r:Map<T0,T1>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model()
     ensures r.Universe() == Model()
     ensures counter_out == counter_in + UBSize()
@@ -114,12 +117,14 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
 
   method {:axiom} Insert(key:map<T0, T1>, val:T2, ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model()[key := val]
     ensures r.Universe() == Universe()[key := val]
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:map<T0, T1>, ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model() - {key}
     ensures counter_out == counter_in + UBSize()
 
@@ -140,6 +145,7 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
 
   method {:axiom} Copy(ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)
     requires Valid()
+    ensures r.Valid()
     ensures r.Model() == Model()
     ensures r.Universe() == Model()
     ensures counter_out == counter_in + UBSize()
