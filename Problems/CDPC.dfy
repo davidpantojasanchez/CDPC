@@ -1,9 +1,7 @@
+include "../Auxiliary/Definitions.dfy"
 
 //datatype Question = CharacteristicQ(int)
 //datatype Answer = CharacteristicA(int) | T
-
-datatype Interview = Empty | Node (Key:int, True:Interview, False:Interview)
-type Candidate = map<int, bool>
 
 /*
 No exhaustivo: Las funciones f y g son parciales
@@ -12,36 +10,36 @@ Sin límite de preguntas: Las ramas de la entrevista adaptativa pueden tener tod
 Parcial: No es necesario poder discernir con certeza absoluta la aptitud de la población; es suficiente con asegurar que está en un determinado rango
 Cambiado para que las respuestas sean booleanas (es suficiente para la reducción)
 */
-ghost predicate CDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P:set<int>, a:real, b:real, x:real, y:real)
-  requires forall c1, c2:Candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
+ghost predicate CDPC(f:map<candidate, bool>, g:map<candidate, int>, P:set<int>, a:real, b:real, x:real, y:real)
+  requires forall c1, c2:candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
   requires f.Keys == g.Keys
-  requires forall c:Candidate | c in f.Keys :: (P <= c.Keys)
+  requires forall c:candidate | c in f.Keys :: (P <= c.Keys)
   requires 0.0 <= a <= b <= 1.0
   requires 0.0 <= x <= y <= 1.0
 {
-  exists interview:Interview :: certificateCDPC(f, g, P, a, b, x, y, interview)
+  exists iv:interview :: certificateCDPC(f, g, P, a, b, x, y, iv)
 }
 
-ghost predicate certificateCDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P:set<int>, a:real, b:real, x:real, y:real, interview:Interview)
+ghost predicate certificateCDPC(f:map<candidate, bool>, g:map<candidate, int>, P:set<int>, a:real, b:real, x:real, y:real, iv:interview)
   //decreases f.Keys
-  requires forall c1, c2:Candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
+  requires forall c1, c2:candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
   requires f.Keys == g.Keys
-  requires forall c:Candidate | c in f.Keys :: (P <= c.Keys)
+  requires forall c:candidate | c in f.Keys :: (P <= c.Keys)
   requires 0.0 <= a <= b <= 1.0
   requires 0.0 <= x <= y <= 1.0
 {
-  if interview == Empty then
+  if iv == Null then
 
   // * Caso base
   |f| == 0 ||
   (
     // Se ha obtenido la información necesaria según x e y
-    var aptPercentage:real := (|(set isApt:Candidate | isApt in f.Keys :: f[isApt] == true)| as real) / (|f| as real);
+    var aptPercentage:real := (|(set isApt:candidate | isApt in f.Keys :: f[isApt] == true)| as real) / (|f| as real);
     (aptPercentage <= x || y <= aptPercentage) &&
     // Por cada caractrística privada, no se ha inferido más información que la permitida por a y b
     forall p:int | p in P ::
     (
-      var privatePercentage:real := (|(set isPrivate:Candidate | isPrivate in f.Keys :: isPrivate[p] == true)| as real) / (|f| as real);
+      var privatePercentage:real := (|(set isPrivate:candidate | isPrivate in f.Keys :: isPrivate[p] == true)| as real) / (|f| as real);
       a <= privatePercentage <= b
     )
   )
@@ -49,21 +47,21 @@ ghost predicate certificateCDPC(f:map<Candidate, bool>, g:map<Candidate, int>, P
   else
 
   // * Caso recursivo
-  var question:int := interview.Key;
+  var question:int := iv.Key;
   // Pregunta válida y no trivial
-  (forall candidate:Candidate | candidate in f.Keys :: question in candidate.Keys) &&
-  //(exists candidate:Candidate | candidate in f.Keys :: candidate[question] == true) &&
-  //(exists candidate:Candidate | candidate in f.Keys :: candidate[question] == false) &&
+  (forall cand:candidate | cand in f.Keys :: question in cand.Keys) &&
+  //(exists cand:candidate | cand in f.Keys :: cand[question] == true) &&
+  //(exists cand:candidate | cand in f.Keys :: cand[question] == false) &&
   // Casos recursivos (candidatos que responden que sí y que no)
   certificateCDPC(
-    (map c:Candidate | c in f.Keys && c[question] == true :: f[c]),
-    (map c:Candidate | c in g.Keys && c[question] == true :: g[c]),
-    P, a, b, x, y, interview.True
+    (map c:candidate | c in f.Keys && c[question] == true :: f[c]),
+    (map c:candidate | c in g.Keys && c[question] == true :: g[c]),
+    P, a, b, x, y, iv.True
   )
   &&
   certificateCDPC(
-    (map c:Candidate | c in f.Keys && c[question] == false :: f[c]),
-    (map c:Candidate | c in g.Keys && c[question] == false :: g[c]),
-    P, a, b, x, y, interview.False
+    (map c:candidate | c in f.Keys && c[question] == false :: f[c]),
+    (map c:candidate | c in g.Keys && c[question] == false :: g[c]),
+    P, a, b, x, y, iv.False
   )
 }
