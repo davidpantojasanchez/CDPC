@@ -21,7 +21,6 @@ ghost predicate CDPC(f:map<candidate, bool>, g:map<candidate, int>, P:set<int>, 
 }
 
 ghost predicate certificateCDPC(f:map<candidate, bool>, g:map<candidate, int>, P:set<int>, a:real, b:real, x:real, y:real, iv:interview)
-  //decreases f.Keys
   requires forall c1, c2:candidate |  c1 in f.Keys && c2 in f.Keys :: c1.Keys == c2.Keys
   requires f.Keys == g.Keys
   requires forall c:candidate | c in f.Keys :: (P <= c.Keys)
@@ -34,13 +33,13 @@ ghost predicate certificateCDPC(f:map<candidate, bool>, g:map<candidate, int>, P
   |f| == 0 ||
   (
     // Se ha obtenido la información necesaria según x e y
-    var aptPercentage:real := (|(set isApt:candidate | isApt in f.Keys :: f[isApt] == true)| as real) / (|f| as real);
-    (aptPercentage <= x || y <= aptPercentage) &&
+    var aptRatio:real := (|(set isApt:candidate | isApt in f.Keys && f[isApt] :: isApt)| as real) / (|f| as real);
+    (aptRatio <= x || y <= aptRatio) &&
     // Por cada caractrística privada, no se ha inferido más información que la permitida por a y b
     forall p:int | p in P ::
     (
-      var privatePercentage:real := (|(set isPrivate:candidate | isPrivate in f.Keys :: isPrivate[p] == true)| as real) / (|f| as real);
-      a <= privatePercentage <= b
+      var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys && isPrivate[p] :: isPrivate)| as real) / (|f| as real);
+      a <= privateRatio <= b
     )
   )
 

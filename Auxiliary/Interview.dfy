@@ -23,10 +23,15 @@ type Interview< T(==) > {
     |Questions()| * |Candidates()|
   }
 
+  method {:axiom} Key(ghost counter_in:nat) returns (key:int, ghost counter_out:nat)
+    requires Valid()
+    requires Model() != Null
+    ensures key == Model().Key
+
   method {:axiom} Get(b:bool, ghost counter_in:nat) returns (e:Interview<T>, ghost counter_out:nat)
     requires Valid()
     requires Model() != Null
-    ensures Valid()
+    ensures e.Valid()
     ensures e.Model() == if b then Model().True else Model().False
     ensures e.Questions() == Questions() - {Model().Key}
     ensures e.Candidates() == (set cand:candidate | cand in Candidates() && cand[Model().Key] == b :: cand)
