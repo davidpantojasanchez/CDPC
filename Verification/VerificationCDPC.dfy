@@ -24,14 +24,14 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
         return true, counter;
       }
       else {
-        var okApt:bool; okApt, counter := correctAptRatio(f, x, y, counter);
-        var okPrivate:bool; okPrivate, counter := correctPrivateRatio(f, P, a, b, counter);
+        var okApt:bool; okApt, counter := correct_apt_ratio(f, x, y, counter);
+        var okPrivate:bool; okPrivate, counter := correct_private_ratio(f, P, a, b, counter);
 
         assert iv.Model() == Null && |f.Model()| != 0;
-        ghost var aptGhost:real :=(|(set isApt:candidate | isApt in f.Keys() && f.Model()[isApt] :: isApt)| as real) / (f.Cardinality() as real);
+        ghost var aptGhost:real :=(|(set aptCand:candidate | aptCand in f.Keys() && f.Model()[aptCand] :: aptCand)| as real) / (f.Cardinality() as real);
         ghost var aptPrivate := forall p:int | p in P.Model() ::
               (
-                var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
+                var privateRatio:real := (|(set privCand:candidate | privCand in f.Keys() && privCand[p] :: privCand)| as real) / (f.Cardinality() as real);
                 a <= privateRatio <= b
               );
         
@@ -52,13 +52,13 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
         invariant in_universe_Map_Map_T(f', f)
         invariant ok == (forall cand:candidate | cand in (f.Keys() - f'.Keys()) :: question in cand.Keys)
       {
-        f', ok, counter := loopQuestionInCandidates(f, f', question, ok, counter);
+        f', ok, counter := loop_check_that_candidates_have_question(f, f', question, ok, counter);
       }
 
-      var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidatesWithSameAnswer(f, question, true, counter);
-      var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidatesWithSameAnswer(f, question, false, counter);
-      var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidatesWithSameAnswer(g, question, true, counter);
-      var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidatesWithSameAnswer(g, question, false, counter);
+      var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidates_with_same_answer(f, question, true, counter);
+      var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidates_with_same_answer(f, question, false, counter);
+      var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidates_with_same_answer(g, question, true, counter);
+      var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidates_with_same_answer(g, question, false, counter);
       
       var iv_true:Interview; iv_true, counter := iv.Get(true, counter);
       var iv_false:Interview; iv_false, counter := iv.Get(false, counter);
@@ -72,7 +72,7 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
   }
 
 
-method loopQuestionInCandidates(f:Map_Map_T<int, bool, bool>, f':Map_Map_T<int, bool, bool>, question:int, ok:bool, ghost counter_in:nat) returns (f'':Map_Map_T<int, bool, bool>, ok':bool, ghost counter:nat)
+method loop_check_that_candidates_have_question(f:Map_Map_T<int, bool, bool>, f':Map_Map_T<int, bool, bool>, question:int, ok:bool, ghost counter_in:nat) returns (f'':Map_Map_T<int, bool, bool>, ok':bool, ghost counter:nat)
   requires in_universe_Map_Map_T(f', f)
   requires ok == (forall cand:candidate | cand in (f.Keys() - f'.Keys()) :: question in cand.Keys)
   ensures in_universe_Map_Map_T(f'', f)
@@ -90,7 +90,7 @@ method loopQuestionInCandidates(f:Map_Map_T<int, bool, bool>, f':Map_Map_T<int, 
 }
 
 
-method correctAptRatio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
+method correct_apt_ratio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
   requires f.Valid()
   requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires 0.0 <= x <= y <= 1.0
@@ -108,7 +108,7 @@ method correctAptRatio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost count
     decreases f'.Cardinality()
     invariant in_universe_Map_Map_T(f', f)
     invariant numTotal == (f.Cardinality() - f'.Cardinality())
-    invariant numApt == |(set isApt:candidate | isApt in (f.Keys() - f'.Keys()) && f.Model()[isApt] :: isApt)|
+    invariant numApt == |(set aptCand:candidate | aptCand in (f.Keys() - f'.Keys()) && f.Model()[aptCand] :: aptCand)|
   {
     ghost var f'prev := f';
     var cand:Map<int, bool>; cand, counter := f'.PickKey(counter);
@@ -117,22 +117,24 @@ method correctAptRatio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost count
     if (isApt) {
       numApt := numApt + 1;
     }
-    assert numApt == |(set isApt:candidate | isApt in (f.Keys() - f'.Keys()) && f.Model()[isApt] :: isApt)| by {
+    assert numApt == |(set aptCand:candidate | aptCand in (f.Keys() - f'.Keys()) && f.Model()[aptCand] :: aptCand)| by {
       assert f'prev.Keys() == (f'.Keys() + {cand.Model()});
       assert (f.Keys() - (f'.Keys() + {cand.Model()})) == (f.Keys() - f'.Keys() - {cand.Model()});
-      assert if isApt then numApt == |(set isApt:candidate | isApt in (f.Keys() - f'.Keys() - {cand.Model()}) && f.Model()[isApt] :: isApt)| + 1
-            else           numApt == |(set isApt:candidate | isApt in (f.Keys() - f'.Keys() - {cand.Model()}) && f.Model()[isApt] :: isApt)|;
+      assert if isApt then numApt == |(set aptCand:candidate | aptCand in (f.Keys() - f'.Keys() - {cand.Model()}) && f.Model()[aptCand] :: aptCand)| + 1
+            else           numApt == |(set aptCand:candidate | aptCand in (f.Keys() - f'.Keys() - {cand.Model()}) && f.Model()[aptCand] :: aptCand)|;
       lemma_card_apt_set_when_remove_element(f.Model(), f.Keys() - f'.Keys(), cand.Model());
     }
     numTotal := numTotal + 1;
+    var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
   }
 
   var aptRatio:real := (numApt as real) / (numTotal as real);
   return (aptRatio <= x || y <= aptRatio), counter;   // ???
 }
 
-method correctPrivateRatio(f:Map_Map_T<int, bool, bool>, P:Set<int>, a:real, b:real, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
+method correct_private_ratio(f:Map_Map_T<int, bool, bool>, P:Set<int>, a:real, b:real, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
   requires f.Valid()
+  requires P.Valid()
   requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires 0.0 <= a <= b <= 1.0
   requires forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys)
@@ -142,48 +144,66 @@ method correctPrivateRatio(f:Map_Map_T<int, bool, bool>, P:Set<int>, a:real, b:r
           var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
           a <= privateRatio <= b
         )
-/*
 {
   counter := counter_in;
 
+  r := true;
   var P':Set<int>; P', counter := P.Copy(counter);
-  var p:int; p, counter := P.Pick(counter);
-
-  var f':Map_Map_T<int, bool, bool>; f', counter := f.Copy(counter);
-  var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
-  var numPriv:int := 0;
-  var numTotal:int := 0;
-  
-  while (!f'Empty)
-    decreases f'.Cardinality()
-    invariant in_universe_Map_Map_T(f', f)
-    invariant numTotal == (f.Cardinality() - f'.Cardinality())
-    invariant numPriv == |(set isPrivate:candidate | isPrivate in (f.Keys() - f'.Keys()) && isPrivate[p] :: isPrivate)|
+  var P'Empty:bool; P'Empty, counter := P.Empty(counter);
+  while (!P'Empty)
+    decreases P'.Cardinality()
+    invariant in_universe_Set(P', P)
   {
-    ghost var f'prev := f';
-    var cand:Map<int, bool>; cand, counter := f'.PickKey(counter);
-    f', counter := f'.Remove(cand, counter);
-    var isPrivate:bool; isPrivate, counter := cand.Get(p, counter);
-    if (isPrivate) {
-      numPriv := numPriv + 1;
-    }
+    var p:int; p, counter := P.Pick(counter);
+
+    var f':Map_Map_T<int, bool, bool>; f', counter := f.Copy(counter);
+    var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
+    var numPriv:int := 0;
+    var numTotal:int := 0;
     
-    numTotal := numTotal + 1;
+    while (!f'Empty)
+      decreases f'.Cardinality()
+      invariant in_universe_Map_Map_T(f', f)
+      invariant numTotal == (f.Cardinality() - f'.Cardinality())
+      invariant numPriv == |(set privCand:candidate | privCand in (f.Keys() - f'.Keys()) && privCand[p] :: privCand)|
+    {
+      ghost var f'prev := f';
+      var cand:Map<int, bool>; cand, counter := f'.PickKey(counter);
+      f', counter := f'.Remove(cand, counter);
+      var isPrivate:bool; isPrivate, counter := cand.Get(p, counter);
+      if (isPrivate) {
+        numPriv := numPriv + 1;
+      }
+
+      assert numPriv == |(set privCand:candidate | privCand in (f.Keys() - f'.Keys()) && privCand[p] :: privCand)| by {
+        assert f'prev.Keys() == (f'.Keys() + {cand.Model()});
+        assert (f.Keys() - (f'.Keys() + {cand.Model()})) == (f.Keys() - f'.Keys() - {cand.Model()});
+        assert if isPrivate then numPriv == |(set privCand:candidate | privCand in (f.Keys() - f'.Keys() - {cand.Model()}) && privCand[p] :: privCand)| + 1
+              else           numPriv == |(set privCand:candidate | privCand in (f.Keys() - f'.Keys() - {cand.Model()}) && privCand[p] :: privCand)|;
+        lemma_card_priv_set_when_remove_element(f.Model(), f.Keys() - f'.Keys(), cand.Model(), p);
+      }
+
+      
+      numTotal := numTotal + 1;
+      var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
+    }
+
+    var privateRatio:real := (numPriv as real) / (numTotal as real);
+
+    assert forall p:int | p in P.Model() ::
+          (
+            var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
+            a <= privateRatio <= b
+          );
+
+    r := r && (a <= privateRatio <= b);
   }
 
-  var privateRatio:real := (numPriv as real) / (numTotal as real);
-
-  assert forall p:int | p in P.Model() ::
-        (
-          var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
-          a <= privateRatio <= b
-        );
-
-  return (a <= privateRatio <= b), counter;
+  return r, counter;
 }
-*/
 
-method candidatesWithSameAnswer<T>(f:Map_Map_T<int, bool, T>, question:int, answer:bool, ghost counter_in:nat) returns (f':Map_Map_T<int, bool, T>, ghost counter:nat)
+
+method candidates_with_same_answer<T>(f:Map_Map_T<int, bool, T>, question:int, answer:bool, ghost counter_in:nat) returns (f':Map_Map_T<int, bool, T>, ghost counter:nat)
   requires f.Valid()
   requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires forall c:candidate |  c in f.Keys() :: question in c
@@ -194,22 +214,46 @@ lemma lemma_card_apt_set_when_remove_element(f:map<candidate, bool>, cands:set<c
   requires cand in cands
   requires cands <= f.Keys
   ensures if f[cand] then
-            (|(set isApt:candidate | isApt in cands && f[isApt] :: isApt)|
+            (|(set aptCand:candidate | aptCand in cands && f[aptCand] :: aptCand)|
             ==
-            |(set isApt:candidate | isApt in (cands - {cand}) && f[isApt] :: isApt)| + 1)
+            |(set aptCand:candidate | aptCand in (cands - {cand}) && f[aptCand] :: aptCand)| + 1)
           else
-            |(set isApt:candidate | isApt in cands && f[isApt] :: isApt)|
+            |(set aptCand:candidate | aptCand in cands && f[aptCand] :: aptCand)|
             ==
-            |(set isApt:candidate | isApt in (cands - {cand}) && f[isApt] :: isApt)|
+            |(set aptCand:candidate | aptCand in (cands - {cand}) && f[aptCand] :: aptCand)|
 {
   if f[cand] {
-    assert (set isApt:candidate | isApt in (cands - {cand}) && f[isApt] :: isApt) + {cand}
+    assert (set aptCand:candidate | aptCand in (cands - {cand}) && f[aptCand] :: aptCand) + {cand}
             ==
-            (set isApt:candidate | isApt in cands && f[isApt] :: isApt);
+            (set aptCand:candidate | aptCand in cands && f[aptCand] :: aptCand);
   }
   else {
-    assert (set isApt:candidate | isApt in (cands - {cand}) && f[isApt] :: isApt)
+    assert (set aptCand:candidate | aptCand in (cands - {cand}) && f[aptCand] :: aptCand)
             ==
-            (set isApt:candidate | isApt in cands && f[isApt] :: isApt);
+            (set aptCand:candidate | aptCand in cands && f[aptCand] :: aptCand);
+  }
+}
+lemma lemma_card_priv_set_when_remove_element(f:map<candidate, bool>, cands:set<candidate>, cand:candidate, p:int)
+  requires cand in cands
+  requires cands <= f.Keys
+  requires forall c:candidate | c in f.Keys :: p in c.Keys
+  ensures if cand[p] then
+            (|(set privCand:candidate | privCand in cands && privCand[p] :: privCand)|
+            ==
+            |(set privCand:candidate | privCand in (cands - {cand}) && privCand[p] :: privCand)| + 1)
+          else
+            |(set privCand:candidate | privCand in cands && privCand[p] :: privCand)|
+            ==
+            |(set privCand:candidate | privCand in (cands - {cand}) && privCand[p] :: privCand)|
+{
+  if cand[p] {
+    assert (set privCand:candidate | privCand in (cands - {cand}) && privCand[p] :: privCand) + {cand}
+            ==
+            (set privCand:candidate | privCand in cands && privCand[p] :: privCand);
+  }
+  else {
+    assert (set privCand:candidate | privCand in (cands - {cand}) && privCand[p] :: privCand)
+            ==
+            (set privCand:candidate | privCand in cands && privCand[p] :: privCand);
   }
 }

@@ -323,7 +323,7 @@ method {:axiom} New_SetSetSet_params<T(==)>(ghost U:set<set<set<T>>>, ghost UBSi
 
 
 // Used as a precondition, to ensure that at initialization the universe equals the model (and implicitly that the set is valid)
-// It is not strictly required, but is be useful
+// It is not strictly required, but it is useful
 ghost predicate init_Set<T(==)>(S:Set<T>) {
     (S.Model() == S.Universe())
 }

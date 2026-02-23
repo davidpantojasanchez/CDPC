@@ -170,6 +170,25 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
 }
 
 
+method {:axiom} New_Map<T0(==), T1(==)>(ghost counter_in:nat) returns (R:Map<T0, T1>, ghost counter_out:nat)
+  ensures counter_out == counter_in +1
+  ensures R.Model() == map[]
+
+method {:axiom} New_Map_Map_T<T0(==), T1(==), T2(==)>(ghost counter_in:nat) returns (R:Map_Map_T<T0, T1, T2>, ghost counter_out:nat)
+  ensures counter_out == counter_in +1
+  ensures R.Model() == map[]
+
+method {:axiom} New_Map_params<T0(==), T1(==)>(ghost U:map<T0, T1>, ghost counter_in:nat) returns (R:Map<T0, T1>, ghost counter_out:nat)
+  ensures counter_out == counter_in +1
+  ensures R.Model() == map[]
+  ensures R.Universe() == U
+
+method {:axiom} New_Map_Map_T_params<T0(==), T1(==), T2(==)>(ghost U:map<map<T0, T1>, T2>, ghost UBSize_Keys:nat, ghost counter_in:nat) returns (R:Map_Map_T<T0, T1, T2>, ghost counter_out:nat)
+  ensures counter_out == counter_in +1
+  ensures R.Model() == map[]
+  ensures R.Universe() == U
+  ensures R.UBSize_Keys() == UBSize_Keys
+
 ghost predicate in_universe_Map(M:Map, U:Map)
 {
   M.Valid() &&

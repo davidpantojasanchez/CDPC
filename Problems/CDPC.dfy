@@ -33,12 +33,12 @@ ghost predicate certificateCDPC(f:map<candidate, bool>, g:map<candidate, int>, P
   |f| == 0 ||
   (
     // Se ha obtenido la información necesaria según x e y
-    var aptRatio:real := (|(set isApt:candidate | isApt in f.Keys && f[isApt] :: isApt)| as real) / (|f| as real);
+    var aptRatio:real := (|(set aptCand:candidate | aptCand in f.Keys && f[aptCand] :: aptCand)| as real) / (|f| as real);
     (aptRatio <= x || y <= aptRatio) &&
     // Por cada caractrística privada, no se ha inferido más información que la permitida por a y b
     forall p:int | p in P ::
     (
-      var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys && isPrivate[p] :: isPrivate)| as real) / (|f| as real);
+      var privateRatio:real := (|(set privCand:candidate | privCand in f.Keys && privCand[p] :: privCand)| as real) / (|f| as real);
       a <= privateRatio <= b
     )
   )
