@@ -26,18 +26,6 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
       else {
         var okApt:bool; okApt, counter := correct_apt_ratio(f, x, y, counter);
         var okPrivate:bool; okPrivate, counter := correct_private_ratio(f, P, a, b, counter);
-
-        assert iv.Model() == Null && |f.Model()| != 0;
-        ghost var aptGhost:real :=(|(set aptCand:candidate | aptCand in f.Keys() && f.Model()[aptCand] :: aptCand)| as real) / (f.Cardinality() as real);
-        ghost var aptPrivate := forall p:int | p in P.Model() ::
-              (
-                var privateRatio:real := (|(set privCand:candidate | privCand in f.Keys() && privCand[p] :: privCand)| as real) / (f.Cardinality() as real);
-                a <= privateRatio <= b
-              );
-        
-        assume okApt == (aptGhost <= x || y <= aptGhost);
-        assume okPrivate == aptPrivate;
-
         return okApt && okPrivate, counter;
       }
     }
@@ -96,8 +84,9 @@ method correct_apt_ratio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost cou
   requires 0.0 <= x <= y <= 1.0
   requires f.Cardinality() != 0
   ensures var aptRatio:real := (|(set isApt:candidate | isApt in f.Keys() && f.Model()[isApt] :: isApt)| as real) / (f.Cardinality() as real);
-          (aptRatio <= x || y <= aptRatio)
+          r == (aptRatio <= x || y <= aptRatio)
 {
+
   counter := counter_in;
   var f':Map_Map_T<int, bool, bool>; f', counter := f.Copy(counter);
   var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
@@ -124,10 +113,16 @@ method correct_apt_ratio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost cou
             else           numApt == |(set aptCand:candidate | aptCand in (f.Keys() - f'.Keys() - {cand.Model()}) && f.Model()[aptCand] :: aptCand)|;
       lemma_card_apt_set_when_remove_element(f.Model(), f.Keys() - f'.Keys(), cand.Model());
     }
-    numTotal := numTotal + 1;
-    var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
-  }
 
+    numTotal := numTotal + 1;
+    f'Empty, counter := f'.Empty(counter);
+
+  }
+  assume f'.Cardinality() == 0 && f'.Keys()=={};
+  assert numTotal == f.Cardinality();
+    assume false;
+
+  assert numApt == |(set aptCand:candidate | aptCand in (f.Keys()) && f.Model()[aptCand] :: aptCand)|;
   var aptRatio:real := (numApt as real) / (numTotal as real);
   return (aptRatio <= x || y <= aptRatio), counter;   // ???
 }
@@ -139,11 +134,11 @@ method correct_private_ratio(f:Map_Map_T<int, bool, bool>, P:Set<int>, a:real, b
   requires 0.0 <= a <= b <= 1.0
   requires forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys)
   requires f.Cardinality() != 0
-  ensures forall p:int | p in P.Model() ::
-        (
-          var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
-          a <= privateRatio <= b
-        )
+  ensures r == forall p:int | p in P.Model() ::
+                 (
+                  var privateRatio:real := (|(set isPrivate:candidate | isPrivate in f.Keys() && isPrivate[p] :: isPrivate)| as real) / (f.Cardinality() as real);
+                  a <= privateRatio <= b
+                )
 {
   counter := counter_in;
 
@@ -185,7 +180,7 @@ method correct_private_ratio(f:Map_Map_T<int, bool, bool>, P:Set<int>, a:real, b
 
       
       numTotal := numTotal + 1;
-      var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
+      f'Empty, counter := f'.Empty(counter);
     }
 
     var privateRatio:real := (numPriv as real) / (numTotal as real);

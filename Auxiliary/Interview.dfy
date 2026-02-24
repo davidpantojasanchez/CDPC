@@ -10,8 +10,8 @@ type Interview< T(==) > {
   {
     AllKeysIn(Model(), Questions()) &&
     EveryPathHasCandidate(Model(), Candidates()) &&
-    (forall c1, c2:candidate |  c1 in Candidates() && c2 in Candidates() :: c1.Keys == c2.Keys) &&
-    (forall c:candidate | c in Candidates() :: (c.Keys == Questions()))
+    //(forall c1, c2:candidate |  c1 in Candidates() && c2 in Candidates() :: c1.Keys == c2.Keys) &&
+    (forall c:candidate | c in Candidates() :: c.Keys == Questions())
   }
 
   ghost function Candidates():set<candidate>
@@ -27,6 +27,7 @@ type Interview< T(==) > {
     requires Valid()
     requires Model() != Null
     ensures key == Model().Key
+    ensures counter_out == counter_in + 1
 
   method {:axiom} Get(b:bool, ghost counter_in:nat) returns (e:Interview<T>, ghost counter_out:nat)
     requires Valid()
