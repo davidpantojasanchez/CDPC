@@ -44,6 +44,8 @@ type Map< T0(==), T1(==) > {
     ensures r.Valid()
     ensures r.Model() == Model()[key := val]
     ensures r.Universe() == Universe()[key := val]
+    ensures r.Model().Keys == Model().Keys + {key}
+    ensures r.Universe().Keys == Universe().Keys + {key}
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:T0, ghost counter_in:nat) returns (r:Map<T0,T1>, ghost counter_out:nat)
@@ -128,6 +130,8 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
     ensures r.Valid()
     ensures r.Model() == Model()[key.Model() := val]
     ensures r.Universe() == Universe()[key.Model() := val]
+    ensures r.Model().Keys == Model().Keys + {key.Model()}
+    ensures r.Universe().Keys == Universe().Keys + {key.Model()}
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:Map<T0, T1>, ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)

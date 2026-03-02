@@ -28,6 +28,10 @@ ensures |A| <= |B|
   }
 }
 
+lemma add_contained_element_lemma<T>(S:set<T>, e:T)
+  requires e in S
+  ensures S + {e} == S
+{}
 
 lemma in_universe_lemma_Set(S:Set, U:Set)
 requires in_universe_Set(S, U)
