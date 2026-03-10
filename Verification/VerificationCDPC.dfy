@@ -34,39 +34,46 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
     var f':Map_Map_T<int, bool, bool>; f', counter := f.Copy(counter);
     var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
     var ok:bool := true;
-
+    
     while (!f'Empty)
       decreases f'.Cardinality()
       invariant in_universe_Map_Map_T(f', f)
       invariant ok == (forall cand:candidate | cand in (f.Keys() - f'.Keys()) :: question in cand.Keys)
+      invariant f'Empty == (f'.Cardinality() == 0)
     {
-      f', ok, counter := loop_check_that_candidates_have_question(f, f', question, ok, counter);
+      f', f'Empty, ok, counter := loop_check_that_candidates_have_question(f, f', question, ok, counter);
     }
 
-    var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidates_with_same_answer(f, question, true, counter);
-    var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidates_with_same_answer(f, question, false, counter);
-    var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidates_with_same_answer(g, question, true, counter);
-    var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidates_with_same_answer(g, question, false, counter);
-    
-    var iv_true:Interview; iv_true, counter := iv.Get(true, counter);
-    var iv_false:Interview; iv_false, counter := iv.Get(false, counter);
+    if ok {
+      var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidates_with_same_answer(f, question, true, counter);
+      var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidates_with_same_answer(f, question, false, counter);
+      var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidates_with_same_answer(g, question, true, counter);
+      var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidates_with_same_answer(g, question, false, counter);
+      
+      var iv_true:Interview; iv_true, counter := iv.Get(true, counter);
+      var iv_false:Interview; iv_false, counter := iv.Get(false, counter);
 
-    var b_true:bool; b_true, counter := verifyCDPC(f_true, g_true, P, a, b, x, y, iv_true, counter);
-    var b_false:bool; b_false, counter := verifyCDPC(f_false, g_false, P, a, b, x, y, iv_false, counter);
-    ok := ok && b_true && b_false;
+      var b_true:bool; b_true, counter := verifyCDPC(f_true, g_true, P, a, b, x, y, iv_true, counter);
+      var b_false:bool; b_false, counter := verifyCDPC(f_false, g_false, P, a, b, x, y, iv_false, counter);
+      ok := ok && b_true && b_false;
 
-    return ok, counter;
+      return ok, counter;
+    }
+
+    return false, counter;
   }
 }
 
 
 
-method loop_check_that_candidates_have_question(f:Map_Map_T<int, bool, bool>, f':Map_Map_T<int, bool, bool>, question:int, ok:bool, ghost counter_in:nat) returns (f'_out:Map_Map_T<int, bool, bool>, ok_out:bool, ghost counter:nat)
+method loop_check_that_candidates_have_question(f:Map_Map_T<int, bool, bool>, f':Map_Map_T<int, bool, bool>, question:int, ok:bool, ghost counter_in:nat) returns (f'_out:Map_Map_T<int, bool, bool>, f'Empty:bool, ok_out:bool, ghost counter:nat)
   requires in_universe_Map_Map_T(f', f)
   requires ok == (forall cand:candidate | cand in (f.Keys() - f'.Keys()) :: question in cand.Keys)
+  requires 0 < f'.Cardinality()
   ensures in_universe_Map_Map_T(f'_out, f)
   ensures ok_out == (forall cand:candidate | cand in (f.Keys() - f'_out.Keys()) :: question in cand.Keys)
   ensures f'_out.Cardinality() == f'.Cardinality() - 1
+  ensures f'Empty == (f'_out.Cardinality() == 0)
 {
   counter := counter_in;
   var cand:Map<int, bool>; cand, counter := f'.PickKey(counter);
@@ -75,7 +82,9 @@ method loop_check_that_candidates_have_question(f:Map_Map_T<int, bool, bool>, f'
   var candHasQuestion:bool; candHasQuestion, counter := cand.ContainsKey(question, counter);
   ok_out := ok && candHasQuestion;
 
-  return f'_out, ok_out, counter;
+  f'Empty, counter := f'_out.Empty(counter);
+
+  return f'_out, f'Empty, ok_out, counter;
 }
 
 
@@ -119,12 +128,12 @@ method correct_apt_ratio(f:Map_Map_T<int, bool, bool>, x:real, y:real, ghost cou
 
     numTotal := numTotal + 1;
     f'Empty, counter := f'.Empty(counter);
-
   }
   assert numTotal == f.Cardinality();
   identity_substraction_lemma(f.Keys(), f'.Keys());
   assert numApt == |(set aptCand:candidate | aptCand in (f.Keys()) && f.Model()[aptCand] :: aptCand)|;
   var aptRatio:real := (numApt as real) / (numTotal as real);
+
   return (aptRatio <= x || y <= aptRatio), counter;
 }
 
@@ -232,6 +241,7 @@ method correct_private_ratio_inner_loop(f:Map_Map_T<int, bool, bool>, f':Map_Map
   requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires forall c:candidate | c in f.Keys() :: (p in c.Keys)
   requires f.Cardinality() != 0
+  requires f'.Cardinality() != 0
   
   requires in_universe_Map_Map_T(f', f)
   requires numTotal == (f.Cardinality() - f'.Cardinality())
@@ -274,23 +284,43 @@ method candidates_with_same_answer<T>(f:Map_Map_T<int, bool, T>, question:int, a
   requires f.Valid()
   requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
   requires forall c:candidate |  c in f.Keys() :: question in c
+  ensures f_out.Valid()
   ensures f_out.Model() == (map c:candidate | c in f.Keys() && c[question] == answer :: f.Model()[c])
+  //ensures counter <= counter_in + poly_candidates_with_same_answer(f)
 {
   counter := counter_in;
 
   var f':Map_Map_T<int, bool, T>; f', counter := f.Copy(counter);
   f_out, counter := New_Map_Map_T_params(f.Model(), f.UBSize_Keys(), counter_in);
+  in_universe_lemma_Map_Map_T(f', f);
+  in_universe_lemma_Map_Map_T(f_out, f);
 
   var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
   
+  assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f) by {
+    assert (f.Cardinality() - f'.Cardinality()) == 0;
+    assert (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f) == 0;
+  }
   while (!f'Empty)
     decreases f'.Cardinality()
     invariant in_universe_Map_Map_T(f', f)
     invariant in_universe_Map_Map_T(f_out, f)
     invariant f'Empty == (f'.Cardinality() == 0)
     invariant f_out.Model() == (map c:candidate | c in (f.Keys() - f'.Keys()) && c[question] == answer :: f.Model()[c])
+    invariant counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f)
+    invariant f'Empty == (f'.Cardinality() == 0)
   {
+    ghost var f'_prev := f';
+    assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f);
     f', f_out, f'Empty, counter := candidates_with_same_answer_loop(f, f', f_out, question, answer, counter);
+    
+    assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f) by {
+      assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'_prev.Cardinality())*poly_candidates_with_same_answer_loop(f) + poly_candidates_with_same_answer_loop(f);
+      assert f'_prev.Cardinality() == (f'.Cardinality() + 1);
+      assert (f.Cardinality() - f'_prev.Cardinality()) == (f.Cardinality() - (f'.Cardinality() + 1));
+      assume (f.Cardinality() - f'_prev.Cardinality())*poly_candidates_with_same_answer_loop(f) == (f.Cardinality() - (f'.Cardinality() + 1))*poly_candidates_with_same_answer_loop(f);
+      assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - (f'.Cardinality() + 1))*poly_candidates_with_same_answer_loop(f) + poly_candidates_with_same_answer_loop(f);
+    }
   }
   identity_substraction_lemma(f.Keys(), f'.Keys());
 
@@ -307,37 +337,63 @@ method candidates_with_same_answer_loop<T>(f:Map_Map_T<int, bool, T>, f':Map_Map
   requires f'.Cardinality() != 0
   requires f''.Model() == (map c:candidate | c in (f.Keys() - f'.Keys()) && c[question] == answer :: f.Model()[c])
 
-  ensures f'_out.Cardinality() < f'.Cardinality()
+  ensures f'_out.Cardinality() == f'.Cardinality() - 1
 
   ensures in_universe_Map_Map_T(f'_out, f)
   ensures in_universe_Map_Map_T(f''_out, f)
   ensures f'Empty == (f'_out.Cardinality() == 0)
   
   ensures f''_out.Model() == (map c:candidate | c in (f.Keys() - f'_out.Keys()) && c[question] == answer :: f.Model()[c])
+  ensures counter <= counter_in + poly_candidates_with_same_answer_loop(f)
 {
+  in_universe_lemma_Map_Map_T(f', f);
+  in_universe_lemma_Map_Map_T(f'', f);
+
   counter := counter_in;
   var cand:Map<int, bool>; cand, counter := f'.PickKey(counter);
   f'_out, counter := f'.Remove(cand, counter);
 
   var cand_answer:bool; cand_answer, counter := cand.Get(question, counter);
+
   if (cand_answer == answer) {
     var f_cand:T; f_cand, counter := f.Get(cand, counter);
     f''_out, counter := f''.Insert(cand, f_cand, counter);
 
-    assert (forall k | k in f''.Universe().Keys :: f''_out.Universe()[k] == f.Model()[k]);
+    assert (forall k | k in f''.Universe().Keys :: f''_out.Universe()[k] == f.Universe()[k]);
     candidates_with_same_answer_lemma_1<T>(f, f',  f'', f'_out, f''_out, cand, question, answer);
+    //assert counter <= counter_in + 3*f.UBSize() + 2*f.UBSize_Keys();
   }
   else {
     f''_out, counter := f''.Copy(counter);
     candidates_with_same_answer_lemma_2(f, f',  f'', f'_out, f''_out, cand, question, answer);
+    //assert counter <= counter_in + 2*f.UBSize() + 2*f.UBSize_Keys();
   }
 
   f'Empty, counter := f'_out.Empty(counter);
 
+  reveal poly_candidates_with_same_answer_loop(f);    // ?
   return f'_out, f''_out, f'Empty, counter;
 }
 
 
+// POLYNOMIALS
+
+
+ghost function poly_candidates_with_same_answer<T>(f:Map_Map_T<int, bool, T>) : (o:nat)
+{
+  /*calc == {
+    f.UBSize() + 2 + f.Cardinality()*poly_candidates_with_same_answer_loop(f);
+    f.UBSize() + 2 + f.Cardinality()*(3*f.UBSize() + 2*f.UBSize_Keys() + 1);
+    f.UBSize() + 2 + (3*f.UBSize()*f.Cardinality() + 2*f.UBSize_Keys()*f.Cardinality() + f.Cardinality());
+    3*f.UBSize()*f.Cardinality() + 2*f.UBSize_Keys()*f.Cardinality() + f.UBSize() + f.Cardinality() + 2;
+  }*/
+  3*f.UBSize()*f.Cardinality() + 2*f.UBSize_Keys()*f.Cardinality() + f.UBSize() + f.Cardinality() + 2
+}
+
+ghost opaque function poly_candidates_with_same_answer_loop<T>(f:Map_Map_T<int, bool, T>) : (o:nat)
+{
+  3*f.UBSize() + 2*f.UBSize_Keys() + 1
+}
 
 // LEMMAS
 
@@ -490,7 +546,7 @@ lemma candidates_with_same_answer_lemma_2<T>(f:Map_Map_T<int, bool, T>, f':Map_M
   assert (map c:candidate | c in (f.Keys() - f'_out.Keys() - {cand.Model()}) && c[question] == answer :: f.Model()[c]) ==
           (map c:candidate | c in (f.Keys() - f'_out.Keys()) && c[question] == answer :: f.Model()[c]);
 }
-
+ 
 
 lemma candidates_with_same_answer_lemma_1_aux<T>(f:Map_Map_T<int, bool, T>, f':Map_Map_T<int, bool, T>, cand:Map<int, bool>, question:int, answer:bool)
   requires forall c:candidate |  c in f.Keys() :: question in c

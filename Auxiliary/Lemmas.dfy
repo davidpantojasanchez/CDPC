@@ -1,5 +1,5 @@
 include "Set.dfy"
-
+include "Map.dfy"
 
 lemma mult_preserves_order(a:int, b:int, a':int, b':int)
   requires 0 <= a <= a'
@@ -59,3 +59,13 @@ ensures |S.Universe()| <= |U.Universe()|
   if_smaller_then_less_cardinality(S.Universe(), U.Universe());
   mult_preserves_order(S.Cardinality(),S.UBSize1(),U.Cardinality(), U.UBSize1());
 }
+
+
+
+lemma in_universe_lemma_Map_Map_T(M:Map_Map_T, U:Map_Map_T)
+  requires in_universe_Map_Map_T(M, U)
+  ensures M.UBSize() <= U.UBSize()
+{
+    if_smaller_then_less_cardinality(M.Model().Keys, U.Model().Keys);
+    mult_preserves_order(M.Cardinality(), M.UBSize_Keys(), U.Cardinality(), U.UBSize_Keys());
+} 

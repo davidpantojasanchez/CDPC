@@ -46,19 +46,25 @@ type Map< T0(==), T1(==) > {
     ensures r.Universe() == Universe()[key := val]
     ensures r.Model().Keys == Model().Keys + {key}
     ensures r.Universe().Keys == Universe().Keys + {key}
+    ensures if key in Keys()
+            then r.Cardinality() == Cardinality()
+            else r.Cardinality() == Cardinality() + 1
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:T0, ghost counter_in:nat) returns (r:Map<T0,T1>, ghost counter_out:nat)
     requires Valid()
     ensures r.Valid()
     ensures r.Model() == Model() - {key}
-    ensures if key !in Keys() then r.Cardinality() == Cardinality()
-            else r.Cardinality() == Cardinality() - 1
+    ensures r.Model().Keys == Model().Keys - {key}
+    ensures if key in Keys()
+            then r.Cardinality() == Cardinality() - 1
+            else r.Cardinality() == Cardinality()
     ensures r.Universe() == Universe()
     ensures counter_out == counter_in + UBSize()
 
  method {:axiom} PickKey(ghost counter_in:nat) returns (key:T0, ghost counter_out:nat)
     requires Valid()
+    requires 0 < Cardinality()
     ensures key in Model().Keys
     ensures counter_out == counter_in + 1
 
@@ -111,8 +117,8 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
   { Cardinality() * UBSize_Keys() }
 
   ghost function {:axiom} UBSize_Keys():nat
-    ensures forall k | k in Universe().Keys :: UBSize_Keys() >= |k|
-    ensures exists k :: k in Universe().Keys && UBSize_Keys() == |k|
+    ensures forall k | k in Universe().Keys :: UBSize_Keys() >= |k|    // model or universe?
+    ensures exists k | k in Universe().Keys :: UBSize_Keys() == |k|
 
   ghost function Cardinality():(c:nat)
   ensures 0 <= c
@@ -132,21 +138,28 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
     ensures r.Universe() == Universe()[key.Model() := val]
     ensures r.Model().Keys == Model().Keys + {key.Model()}
     ensures r.Universe().Keys == Universe().Keys + {key.Model()}
+    ensures if key.Model() in Keys()
+            then r.Cardinality() == Cardinality()
+            else r.Cardinality() == Cardinality() + 1
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:Map<T0, T1>, ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)
     requires Valid()
     ensures r.Valid()
     ensures r.Model() == Model() - {key.Model()}
-    ensures if key.Model() !in Keys() then r.Cardinality() == Cardinality()
-            else r.Cardinality() == Cardinality() - 1
+    ensures r.Model().Keys == Model().Keys - {key.Model()}
+    ensures if key.Model() in Keys()
+            then r.Cardinality() == Cardinality() - 1
+            else r.Cardinality() == Cardinality()
     ensures r.Universe() == Universe()
     ensures counter_out == counter_in + UBSize()
 
  method {:axiom} PickKey(ghost counter_in:nat) returns (key:Map<T0, T1>, ghost counter_out:nat)
     requires Valid()
+    requires 0 < Cardinality()
     ensures key.Valid()
     ensures key.Model() in Model().Keys
+    ensures key.UBSize() <= UBSize_Keys()
     ensures counter_out == counter_in + UBSize_Keys()
 
   method {:axiom} nPairs(ghost counter_in:nat) returns (n:int, ghost counter_out:nat)
@@ -169,6 +182,7 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
     ensures r.Valid()
     ensures r.Model() == Model()
     ensures r.Universe() == Model()
+    //ensures r.UBSize_Keys() == UBSize_Keys()
     ensures counter_out == counter_in + UBSize()
 
 }
@@ -191,13 +205,15 @@ method {:axiom} New_Map_Map_T_params<T0(==), T1(==), T2(==)>(ghost U:map<map<T0,
   ensures counter_out == counter_in +1
   ensures R.Model() == map[]
   ensures R.Universe() == U
-  ensures R.UBSize_Keys() == UBSize_Keys
+  ensures R.UBSize_Keys() <= UBSize_Keys
 
 ghost predicate in_universe_Map(M:Map, U:Map)
 {
   M.Valid() &&
   U.Valid() &&
+  (M.Model().Keys <= U.Model().Keys) &&
   (M.Universe().Keys <= U.Model().Keys) &&
+  //(M.UBSize() <= U.UBSize()) &&
   (forall k | k in M.Universe().Keys :: M.Universe()[k] == U.Model()[k])
 }
 
@@ -205,6 +221,9 @@ ghost predicate in_universe_Map_Map_T(M:Map_Map_T, U:Map_Map_T)
 {
   M.Valid() &&
   U.Valid() &&
+  (M.Model().Keys <= U.Model().Keys) &&
   (M.Universe().Keys <= U.Model().Keys) &&
+  //(M.UBSize() <= U.UBSize()) &&
+  //(M.UBSize_Keys() <= U.UBSize_Keys()) &&
   (forall k | k in M.Universe().Keys :: M.Universe()[k] == U.Model()[k])
 }

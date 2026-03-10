@@ -171,7 +171,7 @@ type SetSet< T(==) > {
     requires Valid()
     ensures R.Valid()
     ensures R.Universe() == Universe()
-    ensures R.UBSize1() == UBSize1()
+    ensures R.UBSize1() <= UBSize1()
     ensures R.Model() == Model() - {e.Model()}
     ensures if e.Model() !in Model() then R.Cardinality() == Cardinality()
             else R.Cardinality() == Cardinality() - 1
@@ -224,8 +224,8 @@ type SetSetSet< T(==) > {
     requires Valid()
     ensures e.Valid()
     requires Model() != {}
-    ensures e.UBSize0() == UBSize1()
-    ensures e.UBSize1() == UBSize2()
+    ensures e.UBSize0() <= UBSize1()
+    ensures e.UBSize1() <= UBSize2()
     ensures e.Model() in Model()
     ensures counter_out == counter_in + UBSize1()
 
@@ -253,9 +253,6 @@ type SetSetSet< T(==) > {
     ensures if e.Model() in Model()
             then R.Cardinality() == Cardinality()
             else R.Cardinality() == Cardinality() + 1
-    ensures if e.Model() in Universe()
-            then |R.Universe()| == |Universe()|
-            else |R.Universe()| == |Universe()| + 1
     ensures if e.UBSize0() <= UBSize1()
             then R.UBSize1() == UBSize1()
             else R.UBSize1() == e.UBSize0()
@@ -270,7 +267,7 @@ type SetSetSet< T(==) > {
     requires Valid()
     ensures R.Valid()
     ensures R.Universe() == Universe()
-    ensures R.UBSize1() == UBSize1()
+    ensures R.UBSize1() <= UBSize1()
     ensures  R.Model() == Model() - {e.Model()}
     ensures if e.Model() !in Model() then R.Cardinality() == Cardinality()
             else R.Cardinality() == Cardinality() - 1
@@ -323,7 +320,7 @@ method {:axiom} New_SetSetSet_params<T(==)>(ghost U:set<set<set<T>>>, ghost UBSi
 
 
 // Used as a precondition, to ensure that at initialization the universe equals the model (and implicitly that the set is valid)
-// It is not strictly required, but it is useful
+// It is not strictly required, but is be useful
 ghost predicate init_Set<T(==)>(S:Set<T>) {
     (S.Model() == S.Universe())
 }
