@@ -49,8 +49,8 @@ ghost predicate certificateCDPC(f:map<candidate, bool>, g:map<candidate, int>, P
   var question:int := iv.Key;
   // Pregunta válida y no trivial
   (forall cand:candidate | cand in f.Keys :: question in cand.Keys) &&
-  //(exists cand:candidate | cand in f.Keys :: cand[question] == true) &&
-  //(exists cand:candidate | cand in f.Keys :: cand[question] == false) &&
+  (exists cand:candidate | cand in f.Keys :: cand[question] == true) &&
+  (exists cand:candidate | cand in f.Keys :: cand[question] == false) &&
   // Casos recursivos (candidatos que responden que sí y que no)
   certificateCDPC(
     (map c:candidate | c in f.Keys && c[question] == true :: f[c]),
