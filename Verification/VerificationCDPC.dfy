@@ -5,39 +5,39 @@ include "../Auxiliary/Set.dfy"
 include "../Auxiliary/Map.dfy"
 include "../Auxiliary/Interview.dfy"
 
+method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview) returns (r:bool, ghost counter:nat)
+  requires pred_problem_preconditions(f, g, P, a, b, x, y, iv)
+  ensures reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
+{
+  r, counter := verifyCDPC_rec(f, g, P, a, b, x, y, iv, |iv.Questions()|*|iv.Candidates()| + 1, 0) by { reveal pred_nodes(nodes, iv); }
+  return r, counter;
+}
 
-method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
+method {:only} verifyCDPC_rec(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, ghost nodes:int, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
   decreases iv.Questions()
-  requires f.Valid() && g.Valid() && P.Valid() && iv.Valid()
-  requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
-  requires f.Keys() == g.Keys()
-  requires forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys)
-  requires 0.0 <= a <= b <= 1.0
-  requires 0.0 <= x <= y <= 1.0
-  
-  ensures r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
+  requires pred_problem_preconditions(f, g, P, a, b, x, y, iv)
+  requires pred_nodes(iv, nodes)
+  ensures reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
+  ensures reveal poly_verifyCDPC_node(f, g, P, iv); counter <= counter_in + nodes*poly_verifyCDPC_node(f, g, P, iv)
 {
   counter := counter_in;
-  var isEmpty:bool; isEmpty, counter := iv.Empty(counter);
+  var isEmpty:bool; isEmpty, counter := iv.Empty(counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
   if (isEmpty) {
-    var nCandidates:int; nCandidates, counter := f.nPairs(counter);
-    if (nCandidates == 0) {
-      return true, counter;
-    }
-    else {
-      var okApt:bool; okApt, counter := correct_apt_ratio(f, x, y, counter);
-      var okPrivate:bool; okPrivate, counter := correct_private_ratio(f, P, a, b, counter);
-      return okApt && okPrivate, counter;
-    }
+    r, counter := verifyCDPC_base_case(f, g, P, a, b, x, y, iv, nodes, counter_in);
+    verifyCDPC_restore_counter_base_case(f, g, P, iv, nodes, counter, counter_in);
+    return r, counter;
   }
   else {
-    var question:int; question, counter := iv.Key(counter);
+    assert f.Valid() by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+    assert counter <= counter_in + 1;
+    var question:int; question, counter := iv.Key(counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
     var f':Map_Map_T<int, bool, bool>; f', counter := f.Copy(counter);
     var f'Empty:bool; f'Empty, counter := f'.Empty(counter);
     var cands_have_question:bool := true;
     var exists_answer_true:bool := false;
     var exists_answer_false:bool := false;
     
+    assert counter <= counter_in + f.UBSize() + 3;
     while (!f'Empty && cands_have_question)
       decreases f'.Cardinality()
       invariant in_universe_Map_Map_T(f', f)
@@ -45,122 +45,110 @@ method verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:S
       invariant cands_have_question ==> (exists_answer_true == (exists cand:candidate | cand in (f.Keys() - f'.Keys()) :: cand[question] == true))
       invariant cands_have_question ==> (exists_answer_false == (exists cand:candidate | cand in (f.Keys() - f'.Keys()) :: cand[question] == false))
       invariant f'Empty == (f'.Cardinality() == 0)
+      invariant counter <= counter_in + f.UBSize() + 3 + (f.Cardinality() - f'.Cardinality())*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f)
     {
+      var f'_prev := f';
       f', f'Empty, cands_have_question, exists_answer_true, exists_answer_false, counter := loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f, f', question, exists_answer_true, exists_answer_false, counter);
       assert cands_have_question ==> (exists_answer_true == (exists cand:candidate | cand in (f.Keys() - f'.Keys()) :: cand[question] == true));
       assert cands_have_question ==> (exists_answer_false == (exists cand:candidate | cand in (f.Keys() - f'.Keys()) :: cand[question] == false));
+      verifyCDPC_restore_counter_invariant(f, f', f'_prev, counter, counter_in);
     }
+    assert counter <= counter_in + f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) by {
+      assert 0 <= f'.Cardinality();
+      assert (f.Cardinality() - f'.Cardinality()) <= f.Cardinality();
+      assert counter_in + f.UBSize() + 3 + (f.Cardinality() - f'.Cardinality())*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) <= counter_in + f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f);
+    }
+
+    assert {:split_here} true;
 
     var question_is_valid_and_not_trivial:bool := cands_have_question && exists_answer_true && exists_answer_false;
-
-    assert question_is_valid_and_not_trivial ==
-      ((forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
-      (exists cand:candidate | cand in f.Keys() :: cand[question] == true) &&
-      (exists cand:candidate | cand in f.Keys() :: cand[question] == false));
-
     if question_is_valid_and_not_trivial {
-      var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidates_with_same_answer(f, question, true, counter);
-      var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidates_with_same_answer(f, question, false, counter);
-      var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidates_with_same_answer(g, question, true, counter);
-      var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidates_with_same_answer(g, question, false, counter);
+
+      var f_true:Map_Map_T<int, bool, bool>; f_true, counter := candidates_with_same_answer(f, question, true, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+      var f_false:Map_Map_T<int, bool, bool>; f_false, counter := candidates_with_same_answer(f, question, false, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+      var g_true:Map_Map_T<int, bool, int>; g_true, counter := candidates_with_same_answer(g, question, true, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+      var g_false:Map_Map_T<int, bool, int>; g_false, counter := candidates_with_same_answer(g, question, false, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+
+      var iv_true:Interview; iv_true, counter := iv.Get(true, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+      var iv_false:Interview; iv_false, counter := iv.Get(false, counter) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+
+      assert counter <= counter_in + poly_verifyCDPC_node(f, g, P, iv) by {
+        assert counter <= counter_in + f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize();
+      }
+
+      ghost var nodes_true := |iv_true.Questions()|*|iv_true.Candidates()|;
+      ghost var nodes_false := |iv_false.Questions()|*|iv_false.Candidates()|;
+
+      var recursive_true:bool; recursive_true, counter := verifyCDPC_rec(f_true, g_true, P, a, b, x, y, iv_true, nodes_true, counter) by {
+        reveal pred_problem_preconditions(); reveal pred_nodes(iv_true, nodes_true);
+        //assert pred_problem_preconditions(f_true, g_true, P, a, b, x, y, iv_true);
+        assume 0 < nodes_true <= |iv_true.Questions()|*|iv_true.Candidates()| + 1;
+        //assert pred_nodes(iv_true, nodes_true);
+      }
+      var recursive_false:bool; recursive_false, counter := verifyCDPC_rec(f_false, g_false, P, a, b, x, y, iv_false, nodes_false, counter) by {
+        reveal pred_problem_preconditions(); reveal pred_nodes(iv_false, nodes_false);
+        assume 0 < nodes_true <= |iv_true.Questions()|*|iv_false.Candidates()| + 1;
+      }
+      r := question_is_valid_and_not_trivial && recursive_true && recursive_false;
+
+      assert {:split_here} true;
+
+      assert pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+      assert pred_branch_info(iv, question_is_valid_and_not_trivial) by { reveal pred_branch_info(iv, question_is_valid_and_not_trivial); }
+      assert pred_calc_variables(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, r) by {
+        reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+        reveal pred_branch_info(iv, question_is_valid_and_not_trivial);
+        reveal pred_calc_variables(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, r);
+      }
+      postcondition_verifyCDPC(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, r);
       
-      var iv_true:Interview; iv_true, counter := iv.Get(true, counter);
-      var iv_false:Interview; iv_false, counter := iv.Get(false, counter);
-
-      var recursive_true:bool; recursive_true, counter := verifyCDPC(f_true, g_true, P, a, b, x, y, iv_true, counter);
-      var recursive_false:bool; recursive_false, counter := verifyCDPC(f_false, g_false, P, a, b, x, y, iv_false, counter);
-      var ok:bool := question_is_valid_and_not_trivial && recursive_true && recursive_false;
-
-      /*assert recursive_true == certificateCDPC(
-        (map c:candidate | c in f.Keys() && c[question] == true :: f.Model()[c]),
-        (map c:candidate | c in g.Keys() && c[question] == true :: g.Model()[c]),
-        P.Model(), a, b, x, y, iv.Model().True
-      );
-      assert recursive_false == certificateCDPC(
-        (map c:candidate | c in f.Keys() && c[question] == false :: f.Model()[c]),
-        (map c:candidate | c in g.Keys() && c[question] == false :: g.Model()[c]),
-        P.Model(), a, b, x, y, iv.Model().False
-      );*/
-
-
-
-      
-      // Problem preconditions
-      assert f.Valid() && g.Valid() && P.Valid() && iv.Valid();
-      assert forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys;
-      assert f.Keys() == g.Keys();
-      assert forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys);
-      assert 0.0 <= a <= b <= 1.0;
-      assert 0.0 <= x <= y <= 1.0;
-      // Information regarding the branch of the demonstration that we are focusing on
-      assert iv.Model() != Null;
-      assert question_is_valid_and_not_trivial == true;
-      // Variables that have been calculated
-      assert question == iv.Model().Key;
       assume false;
-      assert question_is_valid_and_not_trivial ==
-        ((forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == true) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == false));
-      assert recursive_true ==
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == true :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == true :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().True
-        );
-      assert recursive_false ==
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == false :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == false :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().False
-        );
-      assert ok == question_is_valid_and_not_trivial && recursive_true && recursive_false;
-      assume false;
-      postcondition_verifyCDPC(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, ok);
+      assert r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model());
 
-      /*
-      assume ok ==
-        ((forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == true) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == false))
-        &&
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == true :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == true :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().True
-        )
-        &&
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == false :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == false :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().False
-        );
-      assume ok ==
-        (forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == true) &&
-        (exists cand:candidate | cand in f.Keys() :: cand[question] == false)
-        &&
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == true :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == true :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().True
-        )
-        &&
-        certificateCDPC(
-          (map c:candidate | c in f.Keys() && c[question] == false :: f.Model()[c]),
-          (map c:candidate | c in g.Keys() && c[question] == false :: g.Model()[c]),
-          P.Model(), a, b, x, y, iv.Model().False
-        );
-      assume r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model());
-      */
-      assume false;
-      return ok, counter;
+      assert counter <= counter_in + nodes*poly_verifyCDPC_node(f, g, P, iv) by {
+        assert counter <= counter_in + poly_verifyCDPC_node(f, g, P, iv) + nodes_true*poly_verifyCDPC_node(f, g, P, iv) + nodes_false*poly_verifyCDPC_node(f, g, P, iv);
+        assert nodes_true + nodes_false < nodes;
+      }
+      return r, counter;
     }
 
+    assert counter <= counter_in + nodes*poly_verifyCDPC_node(f, g, P, iv) by {
+      assert counter <= counter_in + f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f);
+      assert counter <= counter_in + poly_verifyCDPC_node(f, g, P, iv);
+      reveal pred_nodes(iv, nodes);
+      assert 1 <= nodes;
+      mult_preserves_order(1, poly_verifyCDPC_node(f, g, P, iv), nodes, poly_verifyCDPC_node(f, g, P, iv));
+    }
     return false, counter;
   }
 }
 
+method verifyCDPC_base_case(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, ghost nodes:int, ghost counter_in:nat) returns (r:bool, ghost counter:nat)
+  requires pred_problem_preconditions(f, g, P, a, b, x, y, iv)
+  requires pred_nodes(iv, nodes)
+  requires iv.Model() == Null
+  ensures reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); r == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
+  ensures counter <= counter_in + poly_verifyCDPC_base_case(f, g, P, iv)
+{ 
+  counter := counter_in;
+  assert f.Valid() by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+  var nCandidates:int; nCandidates, counter := f.nPairs(counter);
+  if (nCandidates == 0) {
+    assert certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model()) by {
+      reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+      assert iv.Model() == Null;
+      assert |f.Model()| == 0;
+    }
+    r := true;
+  }
+  else {
+    assert P.Valid() && (forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys) && (forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys)) && (0.0 <= x <= y <= 1.0) && (0.0 <= a <= b <= 1.0) by { reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv); }
+    var okApt:bool; okApt, counter := correct_apt_ratio(f, x, y, counter);
+    var okPrivate:bool; okPrivate, counter := correct_private_ratio(f, P, a, b, counter);
+    r := okApt && okPrivate;
+  }
+  return r, counter;
+}
 
 
 method loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f:Map_Map_T<int, bool, bool>, f'_in:Map_Map_T<int, bool, bool>, question:int, exists_answer_true:bool, exists_answer_false:bool, ghost counter_in:nat) returns (f':Map_Map_T<int, bool, bool>, f'_inEmpty:bool, cands_have_question:bool, exists_answer_true_out:bool, exists_answer_false_out:bool, ghost counter:nat)
@@ -516,12 +504,61 @@ method candidates_with_same_answer_loop<T>(f:Map_Map_T<int, bool, T>, f'_in:Map_
 
 
 
-
 // POLYNOMIALS
 
 
 
 
+ghost opaque function poly_verifyCDPC_node(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, iv:Interview) : (o:nat)
+  ensures poly_verifyCDPC_base_case(f, g, P, iv) + 1 <= o
+  ensures f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) <= o
+  ensures f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize() <= o
+{
+  calc <= {
+    f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize();
+    
+    f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) +
+      6*f.UBSize()*f.Cardinality() + 4*f.UBSize_Keys()*f.Cardinality() + 2*f.UBSize() + 2*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 4*g.UBSize_Keys()*g.Cardinality() + 2*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 8;
+    
+    f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) +
+      6*f.UBSize()*f.Cardinality() + 7*f.UBSize() + 2*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+    
+    f.Cardinality()*(f.UBSize() + 3*f.UBSize_Keys() + 1) +
+      6*f.UBSize()*f.Cardinality() + 7*f.UBSize() + 2*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+    
+    f.UBSize()*f.Cardinality() + 3*f.UBSize() + f.Cardinality() +
+      6*f.UBSize()*f.Cardinality() + 7*f.UBSize() + 2*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+    
+    7*f.UBSize()*f.Cardinality() + 10*f.UBSize() + 3*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+  }
+  calc <= {
+    poly_verifyCDPC_base_case(f, g, P, iv) + f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize();
+
+    poly_verifyCDPC_base_case(f, g, P, iv) +
+      7*f.UBSize()*f.Cardinality() + 10*f.UBSize() + 3*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+
+    f.UBSize()*f.Cardinality()*P.Cardinality() + 3*f.UBSize()*P.Cardinality() + f.Cardinality()*P.Cardinality() + 2*f.UBSize()*f.Cardinality() + 2*f.UBSize() + f.Cardinality() + P.UBSize0()*P.Cardinality() + 3*P.Cardinality() + P.UBSize0() + 5 +
+      7*f.UBSize()*f.Cardinality() + 10*f.UBSize() + 3*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + 2*iv.UBSize() + 11;
+    
+    
+    f.UBSize()*f.Cardinality()*P.Cardinality() + 3*f.UBSize()*P.Cardinality() + f.Cardinality()*P.Cardinality()
+      + 9*f.UBSize()*f.Cardinality() + 12*f.UBSize() + 4*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + P.UBSize0()*P.Cardinality() + 3*P.Cardinality() + P.UBSize0()+ 2*iv.UBSize() + 16;
+  }
+
+  assert 0 <= poly_verifyCDPC_base_case(f, g, P, iv);
+  assert 0 <= f.UBSize() + 3 + f.Cardinality()*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize();
+
+  assert 0 <= 2*poly_candidates_with_same_answer(f) + 2*poly_candidates_with_same_answer(g) + 2*iv.UBSize();
+
+  f.UBSize()*f.Cardinality()*P.Cardinality() + 3*f.UBSize()*P.Cardinality() + f.Cardinality()*P.Cardinality()
+  + 9*f.UBSize()*f.Cardinality() + 12*f.UBSize() + 4*f.Cardinality() + 6*g.UBSize()*g.Cardinality() + 6*g.UBSize() + 2*g.Cardinality() + P.UBSize0()*P.Cardinality() + 3*P.Cardinality() + P.UBSize0()+ 2*iv.UBSize() + 16
+}
+
+ghost function poly_verifyCDPC_base_case(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, iv:Interview) : (o:nat)
+  ensures poly_correct_apt_ratio(f) + poly_correct_private_ratio(f, P) + 2 <= o
+{
+  f.UBSize()*f.Cardinality()*P.Cardinality() + 3*f.UBSize()*P.Cardinality() + f.Cardinality()*P.Cardinality() + 2*f.UBSize()*f.Cardinality() + 2*f.UBSize() + f.Cardinality() + P.UBSize0()*P.Cardinality() + 3*P.Cardinality() + P.UBSize0() + 4
+}
 
 ghost function poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial<T>(f:Map_Map_T<int, bool, T>) : (o:nat)
 {
@@ -773,28 +810,35 @@ lemma candidates_with_same_answer_lemma_2_aux<T>(f:Map_Map_T<int, bool, T>, f'_o
 {}
 
 lemma candidates_with_same_answer_restore_counter_invariant<T>(f:Map_Map_T<int, bool, T>, f':Map_Map_T<int, bool, T>, f'_prev:Map_Map_T<int, bool, T>, counter:nat, counter_in:nat)
-requires counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'_prev.Cardinality())*poly_candidates_with_same_answer_loop(f) + poly_candidates_with_same_answer_loop(f)
-requires f'_prev.Cardinality() == (f'.Cardinality() + 1)
-ensures counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f)
+  requires counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'_prev.Cardinality())*poly_candidates_with_same_answer_loop(f) + poly_candidates_with_same_answer_loop(f)
+  requires f'_prev.Cardinality() == (f'.Cardinality() + 1)
+  ensures counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - f'.Cardinality())*poly_candidates_with_same_answer_loop(f)
 {
   /*assert (f.Cardinality() - f'_prev.Cardinality()) == (f.Cardinality() - (f'.Cardinality() + 1));
   assert (f.Cardinality() - f'_prev.Cardinality())*poly_candidates_with_same_answer_loop(f) == (f.Cardinality() - (f'.Cardinality() + 1))*poly_candidates_with_same_answer_loop(f);
   assert counter <= counter_in + f.UBSize() + 2 + (f.Cardinality() - (f'.Cardinality() + 1))*poly_candidates_with_same_answer_loop(f) + poly_candidates_with_same_answer_loop(f);*/
 }
 
-/*lemma correct_private_ratio_outer_loop_restore_counter_invariant<T>(f:Map_Map_T<int, bool, T>, f':Map_Map_T<int, bool, T>, f'_prev:Map_Map_T<int, bool, T>, P:Set<int>, counter:nat, counter_in:nat)
-requires counter <= counter_in + f.UBSize() + P.UBSize0() + 2 + (f.Cardinality() - f'_prev.Cardinality())*poly_correct_private_ratio_inner_loop(f) + poly_correct_private_ratio_inner_loop(f)
-requires f'_prev.Cardinality() == (f'.Cardinality() + 1)
-ensures counter <= counter_in + f.UBSize() + P.UBSize0() + 2 + (f.Cardinality() - f'.Cardinality())*poly_correct_private_ratio_inner_loop(f)
+lemma verifyCDPC_restore_counter_invariant<T>(f:Map_Map_T<int, bool, T>, f':Map_Map_T<int, bool, T>, f'_prev:Map_Map_T<int, bool, T>, counter:nat, counter_in:nat)
+  requires counter <= counter <= counter_in + f.UBSize() + 3 + (f.Cardinality() - f'_prev.Cardinality())*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f) + poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f)
+  requires f'_prev.Cardinality() == (f'.Cardinality() + 1)
+  ensures counter <= counter_in + f.UBSize() + 3 + (f.Cardinality() - f'.Cardinality())*poly_loop_check_that_candidates_have_question_and_that_it_isnt_trivial(f)
+{}
+
+
+lemma verifyCDPC_restore_counter_base_case(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, iv:Interview, nodes:int, counter:nat, counter_in:nat)
+  requires pred_nodes(iv, nodes)
+  requires counter <= counter_in + poly_verifyCDPC_base_case(f, g, P, iv)
+  ensures counter <= counter_in + nodes*poly_verifyCDPC_node(f, g, P, iv)
 {
+  assert counter <= counter_in + poly_verifyCDPC_node(f, g, P, iv);
+  reveal pred_nodes(iv, nodes);
+  assert 1 <= nodes;
+  mult_preserves_order(1, poly_verifyCDPC_node(f, g, P, iv), nodes, poly_verifyCDPC_node(f, g, P, iv));
+  assert poly_verifyCDPC_node(f, g, P, iv) <= nodes*poly_verifyCDPC_node(f, g, P, iv);
+  assert counter <= counter_in + nodes*poly_verifyCDPC_node(f, g, P, iv);
 }
 
-lemma restore_counter_invariant(card:nat, card':nat, card'_prev:nat, counter_before:nat, counter_loop:nat, counter:nat, counter_in:nat)
-requires counter <= counter_in + counter_before + (card - card'_prev)*counter_loop + counter_loop
-requires card'_prev == (card' + 1)
-ensures counter <= counter_in + counter_before + (card - card')*counter_loop
-{
-}*/
 
 lemma candidates_with_same_answer_counter_simplification<T>(f:Map_Map_T<int, bool, T>, f':Map_Map_T<int, bool, T>, counter:nat, counter_in:nat)
   requires f'.Cardinality() == 0
@@ -806,41 +850,26 @@ lemma candidates_with_same_answer_counter_simplification<T>(f:Map_Map_T<int, boo
 }
 
 lemma postcondition_verifyCDPC(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, question:int, question_is_valid_and_not_trivial:bool, recursive_true:bool, recursive_false:bool, ok:bool)
-  // Problem preconditions
-  requires f.Valid() && g.Valid() && P.Valid() && iv.Valid()
-  requires forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys
-  requires f.Keys() == g.Keys()
-  requires forall c:candidate | c in f.Keys() :: (P.Model() <= c.Keys)
-  requires 0.0 <= a <= b <= 1.0
-  requires 0.0 <= x <= y <= 1.0
-  // Information regarding the branch of the demonstration that we are focusing on
-  requires iv.Model() != Null
-  requires question_is_valid_and_not_trivial == true
-  // Variables that have been calculated
-  requires question == iv.Model().Key
-  requires question_is_valid_and_not_trivial ==
-    ((forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
-    (exists cand:candidate | cand in f.Keys() :: cand[question] == true) &&
-    (exists cand:candidate | cand in f.Keys() :: cand[question] == false))
-  requires recursive_true ==
-    certificateCDPC(
-      (map c:candidate | c in f.Keys() && c[question] == true :: f.Model()[c]),
-      (map c:candidate | c in g.Keys() && c[question] == true :: g.Model()[c]),
-      P.Model(), a, b, x, y, iv.Model().True
-    )
-  requires recursive_false ==
-    certificateCDPC(
-      (map c:candidate | c in f.Keys() && c[question] == false :: f.Model()[c]),
-      (map c:candidate | c in g.Keys() && c[question] == false :: g.Model()[c]),
-      P.Model(), a, b, x, y, iv.Model().False
-    )
-  requires ok == question_is_valid_and_not_trivial && recursive_true && recursive_false
-  // Postcondition
-  ensures ok == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
-{}
+  requires pred_problem_preconditions(f, g, P, a, b, x, y, iv)
+  requires pred_branch_info(iv, question_is_valid_and_not_trivial)
+  requires pred_calc_variables(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, ok)
+  ensures reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+          reveal pred_branch_info(iv, question_is_valid_and_not_trivial);
+          reveal pred_calc_variables(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, ok);
+          ok == certificateCDPC(f.Model(), g.Model(), P.Model(), a, b, x, y, iv.Model())
+{
+  reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+  reveal pred_branch_info(iv, question_is_valid_and_not_trivial);
+  reveal pred_calc_variables(f, g, P, a, b, x, y, iv, question, question_is_valid_and_not_trivial, recursive_true, recursive_false, ok);
+}
 
 
-ghost predicate pred_problem_preconditions(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview)
+
+// Predicates
+
+
+
+ghost opaque predicate pred_problem_preconditions(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview)
 {
   (f.Valid() && g.Valid() && P.Valid() && iv.Valid()) &&
   (forall c1, c2:candidate |  c1 in f.Keys() && c2 in f.Keys() :: c1.Keys == c2.Keys) &&
@@ -850,15 +879,22 @@ ghost predicate pred_problem_preconditions(f:Map_Map_T<int, bool, bool>, g:Map_M
   (0.0 <= x <= y <= 1.0)
 }
 
-ghost predicate pred_branch_info(iv:Interview, question_is_valid_and_not_trivial:bool)
+ghost opaque predicate pred_nodes(iv:Interview, nodes:int)
+{
+  0 < nodes <= |iv.Questions()|*|iv.Candidates()| + 1
+}
+
+ghost opaque predicate pred_branch_info(iv:Interview, question_is_valid_and_not_trivial:bool)
 {
   (iv.Model() != Null) &&
   (question_is_valid_and_not_trivial == true)
 }
 
-ghost predicate pred_calc_variables(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, question:int, question_is_valid_and_not_trivial:bool, recursive_true:bool, recursive_false:bool, ok:bool)
+ghost opaque predicate pred_calc_variables(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<int, bool, int>, P:Set<int>, a:real, b:real, x:real, y:real, iv:Interview, question:int, question_is_valid_and_not_trivial:bool, recursive_true:bool, recursive_false:bool, ok:bool)
   requires pred_problem_preconditions(f, g, P, a, b, x, y, iv) && pred_branch_info(iv, question_is_valid_and_not_trivial)
 {
+  reveal pred_problem_preconditions(f, g, P, a, b, x, y, iv);
+  reveal pred_branch_info(iv, question_is_valid_and_not_trivial);
   (question == iv.Model().Key) &&
   (question_is_valid_and_not_trivial ==
     ((forall cand:candidate | cand in f.Keys() :: question in cand.Keys) &&
@@ -879,7 +915,11 @@ ghost predicate pred_calc_variables(f:Map_Map_T<int, bool, bool>, g:Map_Map_T<in
       P.Model(), a, b, x, y, iv.Model().False
     )
   ) &&
-  (ok == question_is_valid_and_not_trivial && recursive_true && recursive_false)
+  (ok == (question_is_valid_and_not_trivial && recursive_true && recursive_false))
 }
 
+ghost opaque predicate pred_ok_definition(question_is_valid_and_not_trivial:bool, recursive_true:bool, recursive_false:bool, ok:bool)
+{
+  (ok == (question_is_valid_and_not_trivial && recursive_true && recursive_false))
+}
 
