@@ -34,6 +34,7 @@ type Interview< T(==) > {
     requires Model() != Null
     ensures e.Valid()
     ensures e.Model() == if b then Model().True else Model().False
+    ensures e.UBSize() <= UBSize()
     ensures e.Questions() == Questions() - {Model().Key}
     ensures |e.Questions()| == |Questions()| - 1
     ensures e.Candidates() == (set cand:candidate | cand in Candidates() && cand[Model().Key] == b :: cand)

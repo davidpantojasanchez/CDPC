@@ -13,6 +13,15 @@ lemma mult_preserves_strict_order(a:int, b:int, a':int, b':int)
   ensures a*b < a'*b'
 {}
 
+lemma mult_preserves_order_3(a:int, b:int, c:int, a':int, b':int, c':int)
+  requires 0 <= a <= a'
+  requires 0 <= b <= b'
+  requires 0 <= c <= c'
+  ensures (a*b*c) <= (a'*b'*c')
+{
+  mult_preserves_order(a, b, a', b');
+}
+
 lemma associativity(a:int, b:int, c:int)
   ensures (a*b)*c == a*(b*c)
 {}
@@ -33,6 +42,18 @@ ensures |A| <= |B|
     if_smaller_then_less_cardinality(A - {a}, B - {a});
   }
 }
+
+lemma set_operation_swap_sign_addition<T>(U:set<T>, S:set<T>, e:T)
+  requires U - {e} == S
+  requires e in U
+  ensures U == S + {e}
+{  }
+
+lemma set_operation_remove_parenthesis<T>(U:set<T>, S:set<T>, e:T)
+  requires e in U
+  ensures U - (S + {e}) == U - S - {e}
+{  }
+
 
 lemma in_universe_lemma_Set(S:Set, U:Set)
 requires in_universe_Set(S, U)
@@ -65,8 +86,6 @@ ensures |S.Universe()| <= |U.Universe()|
   if_smaller_then_less_cardinality(S.Universe(), U.Universe());
   mult_preserves_order(S.Cardinality(),S.UBSize1(),U.Cardinality(), U.UBSize1());
 }
-
-
 
 lemma in_universe_lemma_Map_Map_T(M:Map_Map_T, U:Map_Map_T)
   requires in_universe_Map_Map_T(M, U)

@@ -141,6 +141,9 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
     ensures if key.Model() in Keys()
             then r.Cardinality() == Cardinality()
             else r.Cardinality() == Cardinality() + 1
+    ensures if key.UBSize() <= UBSize_Keys()
+            then r.UBSize_Keys() == UBSize_Keys()
+            else r.UBSize_Keys() == key.UBSize()
     ensures counter_out == counter_in + UBSize()
 
   method {:axiom} Remove(key:Map<T0, T1>, ghost counter_in:nat) returns (r:Map_Map_T<T0,T1,T2>, ghost counter_out:nat)
@@ -182,7 +185,7 @@ type Map_Map_T< T0(==), T1(==), T2(==) > {
     ensures r.Valid()
     ensures r.Model() == Model()
     ensures r.Universe() == Model()
-    //ensures r.UBSize_Keys() == UBSize_Keys()
+    ensures r.UBSize_Keys() == UBSize_Keys()
     ensures counter_out == counter_in + UBSize()
 
 }
@@ -213,7 +216,6 @@ ghost predicate in_universe_Map(M:Map, U:Map)
   U.Valid() &&
   (M.Model().Keys <= U.Model().Keys) &&
   (M.Universe().Keys <= U.Model().Keys) &&
-  //(M.UBSize() <= U.UBSize()) &&
   (forall k | k in M.Universe().Keys :: M.Universe()[k] == U.Model()[k])
 }
 
@@ -223,7 +225,7 @@ ghost predicate in_universe_Map_Map_T(M:Map_Map_T, U:Map_Map_T)
   U.Valid() &&
   (M.Model().Keys <= U.Model().Keys) &&
   (M.Universe().Keys <= U.Model().Keys) &&
-  //(M.UBSize() <= U.UBSize()) &&
-  //(M.UBSize_Keys() <= U.UBSize_Keys()) &&
+  (M.Cardinality() <= U.Cardinality()) &&
+  (M.UBSize_Keys() <= U.UBSize_Keys()) &&
   (forall k | k in M.Universe().Keys :: M.Universe()[k] == U.Model()[k])
 }
